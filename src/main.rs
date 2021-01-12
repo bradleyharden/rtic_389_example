@@ -1,59 +1,53 @@
 #![no_std]
 #![no_main]
 
-use core::marker::PhantomData;
-
 use panic_halt as _;
-
-use atsamd_hal as hal;
-use hal::target_device as pac;
-
-struct PadsT<S, I, P0, P1, P2, P3> {
-    sercom: PhantomData<S>,
-    ioset: PhantomData<I>,
-    pad0: PhantomData<P0>,
-    pad1: PhantomData<P1>,
-    pad2: PhantomData<P2>,
-    pad3: PhantomData<P3>,
-}
-
-trait Pads {
-    type Sercom;
-    type IoSet;
-    type Pad0;
-    type Pad1;
-    type Pad2;
-    type Pad3;
-}
-
-impl<S, I, P0, P1, P2, P3> Pads for PadsT<S, I, P0, P1, P2, P3> {
-    type Sercom = S;
-    type IoSet = I;
-    type Pad0 = P0;
-    type Pad1 = P1;
-    type Pad2 = P2;
-    type Pad3 = P3;
-}
+use atsamd_hal::target_device as pac;
 
 #[rtic::app(device = crate::pac)]
 mod app {
 
     #[resources]
-    struct Resources<P: Pads> {
-        p: P
+    struct Resources {
+        #[init(0)]
+        one: u8,
+        #[init(0)]
+        two: u16,
     }
 
     #[init]
-    fn init(_: init::Context) -> init::LateResources<impl Pads> {
-        let p = PadsT {
-            sercom: PhantomData::<u8>,
-            ioset: PhantomData::<u16>,
-            pad0: PhantomData::<u32>,
-            pad1: PhantomData::<i8>,
-            pad2: PhantomData::<i16>,
-            pad3: PhantomData::<i32>,
-        };
-        init::LateResources{p}
+    fn init(_: init::Context) -> init::LateResources {
+        init::LateResources{}
+    }
+
+    #[task(binds = PAC, priority = 1, resources = [one, two])]
+    fn task_1(ctx: task_1::Context) {
+        let task_1::Resources { one, two } = ctx.resources;
+        (one, two).lock(|one, two| {
+            *one = 5;
+            *two = 10;
+        });
+        //(one, two).lock(|one, two| {
+        //    *one = 5;
+        //    *two = 10;
+        //});
+    }
+
+    #[task(binds = AC, priority = 2, resources = [one, two])]
+    fn task_2(ctx: task_2::Context) {
+        let task_2::Resources { mut one, mut two } = ctx.resources;
+        one.lock(|one| {
+            two.lock(|two| {
+                *one = 5;
+                *two = 10;
+            });
+        });
+        one.lock(|one| {
+            two.lock(|two| {
+                *one = 5;
+                *two = 10;
+            });
+        });
     }
 
 }
